@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>判定ロジックの検証 — どまつり演舞メモ</title>
+  <style>
+    body {
+      margin: 0 auto; padding: 20px; max-width: 900px;
+      font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+      color: #1c1917; background: #ffffff; line-height: 1.6;
+    }
+    h1 { font-size: 20px; }
+    .hint { color: #57534e; font-size: 13px; }
+    .summary { font-size: 18px; font-weight: 700; padding: 10px 14px; border-radius: 8px; }
+    .summary.pass { background: #dcfce7; color: #14532d; }
+    .summary.fail { background: #fee2e2; color: #7f1d1d; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border: 1px solid #d6d3d1; padding: 5px 8px; text-align: left; vertical-align: top; }
+    th { background: #f5f5f4; }
+    tr.pass td:first-child { color: #15803d; font-weight: 700; }
+    tr.fail { background: #fee2e2; }
+    tr.fail td:first-child { color: #b91c1c; font-weight: 700; }
+    #app { display: none; }
+  </style>
+</head>
+<body>
+  <h1>判定ロジックの検証</h1>
+  <p class="hint">
+    このファイルをブラウザで開くだけで実行されます（サーバー不要）。
+    data.js を書き換えたあとに開いて、全件パスすることを確認してください。
+  </p>
+
+  <!-- app.js の描画先。テストページでは使わないので隠しておく -->
+  <div id="app"></div>
+  <div id="results"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script src="tests.js"></script>
+</body>
+</html>
