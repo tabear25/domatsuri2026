@@ -80,18 +80,14 @@ window.DOMATSURI_DATA = {
 
     // --- 夜さり華-yosaribana- ---
     // 8/28（前夜祭）の出演は公式チームページに掲載がない。
-    { date: "2026-08-29", teamId: "yosaribana", venueId: "tv_tower",    start: "10:30", end: null },
-    // 会場別のタイムテーブルではこの枠が 13:30頃（Cブロック）になっている。
-    // ここではチームページ側の 12:30 を採っている。どちらも「頃」表記の目安。
-    { date: "2026-08-29", teamId: "yosaribana", venueId: "hisaya_main", start: "12:30", end: null },
-    { date: "2026-08-29", teamId: "yosaribana", venueId: "hirabari",    start: "14:42", end: null,
-      note: "平針パレード会場は 8/29 12:30〜17:00 が交通規制。地下鉄で向かうこと。" },
-    { date: "2026-08-29", teamId: "yosaribana", venueId: "gurume",      start: "16:42", end: null },
-    { date: "2026-08-29", teamId: "yosaribana", venueId: "oasis21",     start: "18:18", end: null },
-    { date: "2026-08-30", teamId: "yosaribana", venueId: "jr_towers",   start: "10:00", end: null },
-    { date: "2026-08-30", teamId: "yosaribana", venueId: "dotoku",      start: "12:00", end: null },
-    { date: "2026-08-30", teamId: "yosaribana", venueId: "oasis21",     start: "14:00", end: null },
-    { date: "2026-08-30", teamId: "yosaribana", venueId: "agf_sakae",   start: "16:06", end: null },
+    { date: "2026-08-29", teamId: "yosaribana", venueId: "osu_kannon",  start: "11:30", end: null },
+    { date: "2026-08-29", teamId: "yosaribana", venueId: "hisaya_main", start: "13:30", end: null },
+    { date: "2026-08-29", teamId: "yosaribana", venueId: "oasis21",     start: "15:30", end: null },
+    { date: "2026-08-29", teamId: "yosaribana", venueId: "gurume",      start: "17:30", end: null },
+    { date: "2026-08-30", teamId: "yosaribana", venueId: "jr_towers",   start: "10:42", end: null },
+    { date: "2026-08-30", teamId: "yosaribana", venueId: "nagoya_castle", start: "12:54", end: null },
+    { date: "2026-08-30", teamId: "yosaribana", venueId: "oasis21",     start: "14:24", end: null },
+    { date: "2026-08-30", teamId: "yosaribana", venueId: "nadya",       start: "15:42", end: null },
   ],
 
   // ---- 駅ごとの上書き -----------------------------------------------------
@@ -125,6 +121,11 @@ window.DOMATSURI_DATA = {
     "名古屋|矢場町":     { min: 11, via: "東山線 名古屋→栄 ／ 名城線 栄→矢場町", checked: true },
     "名古屋|道徳":       { min: 18, via: "名鉄名古屋本線 直通 5駅", checked: true },
     "栄|金山":           { min: 7,  via: "名城線 4駅", checked: true },
+    // 上前津での鶴舞線への乗り換え待ちが6〜9分あるので、乗車時間の差ほどには
+    // 矢場町発と久屋大通発で所要時間が変わらない。
+    "久屋大通|大須観音": { min: 14, via: "名城線 久屋大通→上前津 ／ 鶴舞線 上前津→大須観音", checked: true },
+    "矢場町|大須観音":   { min: 13, via: "名城線 矢場町→上前津 ／ 鶴舞線 上前津→大須観音", checked: true },
+    "久屋大通|名古屋城": { min: 2,  via: "名城線 1駅", checked: true },
 
     // -- 駅数からの推定（いずれも徒歩が速いか、今回の判定に効かない区間） --
     "栄|久屋大通":       { min: 2,  via: "名城線 1駅", checked: false },
@@ -132,13 +133,11 @@ window.DOMATSURI_DATA = {
     "名古屋|栄":         { min: 5,  via: "東山線 伏見経由 2駅", checked: false },
     "名古屋|久屋大通":   { min: 4,  via: "桜通線 3駅", checked: false },
     "名古屋|金山":       { min: 5,  via: "JR東海道線または名鉄名古屋本線 1駅", checked: false },
-    "久屋大通|名古屋城": { min: 2,  via: "名城線 1駅", checked: false },
     "栄|名古屋城":       { min: 4,  via: "名城線 2駅", checked: false },
     "矢場町|名古屋城":   { min: 6,  via: "名城線 3駅", checked: false },
     "久屋大通|金山":     { min: 9,  via: "名城線 5駅", checked: false },
     "名古屋城|金山":     { min: 11, via: "名城線 栄・上前津経由 6駅", checked: false },
     "金山|道徳":         { min: 8,  via: "名鉄常滑線 3駅", checked: false },
-    "矢場町|大須観音":   { min: 8,  via: "名城線 矢場町→上前津 ／ 鶴舞線 上前津→大須観音", checked: false },
     "久屋大通|平針":     { min: 31, via: "名城線 久屋大通→上前津 ／ 鶴舞線 上前津→平針", checked: false },
   },
 
