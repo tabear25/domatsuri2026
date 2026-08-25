@@ -102,12 +102,95 @@
     return 2 * earthRadius * Math.asin(Math.min(1, Math.sqrt(a)));
   }
 
-  function walkMinutes(fromVenue, toVenue) {
+  function walkMinutes(fromVenue, toVenue, source) {
+    var data = source || DATA;
     if (fromVenue === toVenue) return 0;
     var straightMeters = haversineMeters(fromVenue, toVenue);
-    var walkingMeters = straightMeters * DATA.detourFactor;
-    return Math.ceil(walkingMeters / DATA.walkSpeedMPerMin);
+    var walkingMeters = straightMeters * data.detourFactor;
+    return Math.ceil(walkingMeters / data.walkSpeedMPerMin);
   }
+
+  /* ---------------------------------------------------------------------
+   * 公共交通機関の見積もり
+   *
+   * 「会場から最寄り駅まで歩く → 電車を待つ → 乗る → 降りた駅から会場まで歩く」
+   * の4つを足す。駅から駅までの所要時間は data.js の stationRides が持っていて、
+   * 今回のスケジュールで判定に効く区間は実測値が入っている。
+   * 載っていない区間だけ、直線距離から概算にフォールバックする。
+   * ------------------------------------------------------------------- */
+
+  function boardingWaitMinutes(data, stationName) {
+    var station = data.stations ? data.stations[stationName] : null;
+    if (station && typeof station.waitMin === "number") return station.waitMin;
+    return data.boardingWaitMin;
+  }
+
+  function findStationRide(data, fromStation, toStation) {
+    var table = data.stationRides || {};
+    return table[fromStation + "|" + toStation] ||
+           table[toStation + "|" + fromStation] || null;
+  }
+
+  /** 電車を使った場合の見積もり。使えない・使う意味がないときは null を返す。 */
+  function transitMinutes(fromVenue, toVenue, source) {
+    var data = source || DATA;
+    if (!fromVenue || !toVenue) return null;
+    if (!fromVenue.station || !toVenue.station) return null;
+    if (typeof fromVenue.stationWalkMin !== "number" ||
+        typeof toVenue.stationWalkMin !== "number") return null;
+    // 最寄り駅が同じなら、乗っても降りる場所が変わらない
+    if (fromVenue.station === toVenue.station) return null;
+
+    var ride = findStationRide(data, fromVenue.station, toVenue.station);
+    var rideMinutes;
+    var via;
+    var isEstimated = false;
+    if (ride) {
+      rideMinutes = ride.min;
+      via = ride.via;
+    } else {
+      var kilometers = haversineMeters(fromVenue, toVenue) / 1000;
+      rideMinutes = Math.ceil(data.transitFallback.baseMin +
+        data.transitFallback.minPerKm * kilometers);
+      via = "直線距離からの概算";
+      isEstimated = true;
+    }
+
+    var waitMinutes = boardingWaitMinutes(data, fromVenue.station);
+    return {
+      minutes: fromVenue.stationWalkMin + waitMinutes + rideMinutes + toVenue.stationWalkMin,
+      fromStation: fromVenue.station,
+      toStation: toVenue.station,
+      fromWalkMin: fromVenue.stationWalkMin,
+      toWalkMin: toVenue.stationWalkMin,
+      waitMin: waitMinutes,
+      rideMin: rideMinutes,
+      via: via,
+      isEstimated: isEstimated
+    };
+  }
+
+  /**
+   * 会場から会場への移動時間。徒歩と電車の速いほうを採る。
+   * ただし差が transitAdvantageMin 未満なら徒歩のままにする。
+   * 数分縮めるために階段を下りて1駅乗って上がる、ということは実際にはやらないため。
+   */
+  function travelPlan(fromVenue, toVenue, source) {
+    var data = source || DATA;
+    if (fromVenue === toVenue) {
+      return { minutes: 0, mode: "same", walkMin: 0, transit: null };
+    }
+    var walk = walkMinutes(fromVenue, toVenue, data);
+    var transit = transitMinutes(fromVenue, toVenue, data);
+    var useTransit = !!transit && transit.minutes + data.transitAdvantageMin <= walk;
+    return {
+      minutes: useTransit ? transit.minutes : walk,
+      mode: useTransit ? "transit" : "walk",
+      walkMin: walk,
+      transit: transit
+    };
+  }
+
   var problems = [];
 
   function buildEntries(source, targetDate) {
@@ -167,7 +250,8 @@
         venueId: performance.venueId,
         startMin: startMin === null ? 0 : startMin,
         endMin: endMin === null ? 0 : endMin,
-        endIsEstimated: endIsEstimated
+        endIsEstimated: endIsEstimated,
+        note: performance.note || null
       };
     });
 
@@ -179,23 +263,26 @@
   }
 
   /** 時系列で隣り合う演舞のペアを作り、それぞれの余裕分を判定する。 */
-  function buildPairs(entries) {
+  function buildPairs(entries, source) {
+    var data = source || DATA;
     var pairs = [];
     for (var i = 0; i < entries.length - 1; i++) {
       var from = entries[i];
       var to = entries[i + 1];
       var hasBothVenues = !!(from.venue && to.venue);
-      var walk = hasBothVenues ? walkMinutes(from.venue, to.venue) : null;
+      var travel = hasBothVenues ? travelPlan(from.venue, to.venue, data) : null;
       var straight = hasBothVenues ? haversineMeters(from.venue, to.venue) : null;
-      var slack = walk === null ? null : to.startMin - from.endMin - walk;
+      var slack = travel === null ? null : to.startMin - from.endMin - travel.minutes;
       pairs.push({
         from: from,
         to: to,
-        walk: walk,
+        travel: travel,
         straight: straight,
         slack: slack,
         level: slack === null ? null : judge(slack),
-        isCrossTeam: from.team.id !== to.team.id
+        isCrossTeam: from.team.id !== to.team.id,
+        // 開始時刻が同じ2つは、移動時間の問題ではなく物理的にどちらか一方しか見られない
+        isSimultaneous: from.startMin === to.startMin
       });
     }
     return pairs;
@@ -218,9 +305,10 @@
    * origin を省略すると Google 側が現在地を出発地として扱うので、
    * このページで位置情報の許可を取る必要がない。
    */
-  function directionsUrl(venue) {
+  function directionsUrl(venue, travelMode) {
     return "https://www.google.com/maps/dir/?api=1&destination=" +
-      encodeURIComponent(venue.lat + "," + venue.lng) + "&travelmode=walking";
+      encodeURIComponent(venue.lat + "," + venue.lng) +
+      "&travelmode=" + (travelMode || "walking");
   }
 
   /**
@@ -348,8 +436,13 @@
       '<div class="card-time">' + escapeHtml(timeText) + estimatedBadge + "</div>" +
       '<div class="card-venue">' + escapeHtml(entry.venue.name) + "</div>" +
       '<div class="card-access">' + escapeHtml(entry.venue.access) + "</div>" +
-      '<a class="map-button" href="' + escapeHtml(directionsUrl(entry.venue)) +
-        '" target="_blank" rel="noopener">🧭 ここへ道案内</a>' +
+      (entry.note ? '<div class="card-note">' + escapeHtml(entry.note) + "</div>" : "") +
+      '<div class="map-buttons">' +
+        '<a class="map-button" href="' + escapeHtml(directionsUrl(entry.venue, "transit")) +
+          '" target="_blank" rel="noopener">🚇 電車で行く</a>' +
+        '<a class="map-button secondary" href="' + escapeHtml(directionsUrl(entry.venue, "walking")) +
+          '" target="_blank" rel="noopener">🚶 歩いて行く</a>' +
+      "</div>" +
       "</li>";
   }
 
@@ -362,17 +455,40 @@
     var slackText = pair.slack >= 0
       ? "余裕 " + pair.slack + "分"
       : Math.abs(pair.slack) + "分 足りない";
-    var walkText = pair.walk === 0 ? "同じ会場" : "徒歩 約" + pair.walk + "分";
+
+    var travel = pair.travel;
+    var moveText;
+    if (travel.mode === "same") moveText = "同じ会場";
+    else if (travel.mode === "transit") moveText = "電車 約" + travel.minutes + "分";
+    else moveText = "徒歩 約" + travel.minutes + "分";
+
     var crossBadge = pair.isCrossTeam ? '<span class="band-cross">2チームはしご</span>' : "";
+    var simultaneousBadge = pair.isSimultaneous
+      ? '<span class="band-cross">同時刻・どちらか一方</span>' : "";
+
+    // 電車を使う区間は、当日そのまま動けるように乗り換えの中身まで出す
+    var routeDetail = "";
+    if (travel.mode === "transit") {
+      var transit = travel.transit;
+      var steps = transit.fromStation + "駅まで徒歩" + transit.fromWalkMin + "分" +
+        " → 待ち" + transit.waitMin + "分" +
+        " → " + transit.via + "（" + transit.rideMin + "分）" +
+        " → 会場まで徒歩" + transit.toWalkMin + "分";
+      routeDetail = '<span class="band-route-detail">' + escapeHtml(steps) +
+        (transit.isEstimated
+          ? '<span class="badge-estimated">区間データ未登録・概算</span>' : "") +
+        "</span>";
+    }
 
     // 同じ会場なら移動そのものが無いのでリンクは出さない
     var routeLinks = "";
-    if (pair.walk !== null && pair.walk > 0) {
+    if (travel.mode !== "same") {
       routeLinks += '<a class="route-link" href="' +
         escapeHtml(routeUrl(pair.from.venue, pair.to.venue, "walking")) +
         '" target="_blank" rel="noopener">🚶 徒歩ルート</a>';
-      // 徒歩では遠すぎる区間は、電車のほうが現実的なので実測を見られるようにする
-      if (pair.straight !== null && pair.straight >= DATA.transitHintMeters) {
+      // 電車を採用した区間と、徒歩では遠すぎる区間は Google の実測も見られるようにする
+      if (travel.mode === "transit" ||
+          (pair.straight !== null && pair.straight >= DATA.transitHintMeters)) {
         routeLinks += '<a class="route-link transit" href="' +
           escapeHtml(routeUrl(pair.from.venue, pair.to.venue, "transit")) +
           '" target="_blank" rel="noopener">🚇 電車ルート</a>';
@@ -383,8 +499,10 @@
     return '<li class="' + classNames.join(" ") + '">' +
       '<span class="band-face">' + pair.level.icon + pair.level.face + "</span>" +
       '<span class="band-label">' + escapeHtml(pair.level.label) + "</span>" +
-      '<span class="band-detail">' + escapeHtml(slackText) + " ／ " + escapeHtml(walkText) + "</span>" +
+      '<span class="band-detail">' + escapeHtml(slackText) + " ／ " + escapeHtml(moveText) + "</span>" +
       crossBadge +
+      simultaneousBadge +
+      routeDetail +
       routeLinks +
       "</li>";
   }
@@ -446,9 +564,13 @@
     var note = '<footer class="note">' +
       "掲載されている開始時刻はどれも「◯◯頃」の目安で、終了時刻は公表されていません。" +
       "このページでは1演舞を " + DATA.defaultDurationMin + " 分として計算しています。<br>" +
-      "徒歩時間は会場間の直線距離を " + DATA.detourFactor + " 倍し、分速 " + DATA.walkSpeedMPerMin +
-      "m で割った概算です。人混み・交通規制・入場待ちは含みません。" +
-      "地下鉄を使えば間に合う区間もあるので、判定が渋いところは電車ルートのリンクで実測を見てください。" +
+      "移動時間は徒歩と電車の速いほうを採っています。電車は「会場から最寄り駅までの徒歩" +
+      " ＋ 待ち " + DATA.boardingWaitMin + "分 ＋ 乗車 ＋ 駅から会場までの徒歩」で、" +
+      "乗車時間は Yahoo!路線情報で確認した区間の実測値です。" +
+      "徒歩は直線距離を " + DATA.detourFactor + " 倍し、分速 " + DATA.walkSpeedMPerMin +
+      "m で割った概算です。<br>" +
+      "どちらも人混み・交通規制・入場待ち・改札の混雑は含みません。" +
+      "ギリギリの区間は、各バンドのルートリンクから Google の実測を見て最終判断してください。" +
       "</footer>";
 
     document.getElementById("app").innerHTML =
@@ -496,6 +618,10 @@
     toHHMM: toHHMM,
     haversineMeters: haversineMeters,
     walkMinutes: walkMinutes,
+    transitMinutes: transitMinutes,
+    travelPlan: travelPlan,
+    findStationRide: findStationRide,
+    boardingWaitMinutes: boardingWaitMinutes,
     routeUrl: routeUrl,
     directionsUrl: directionsUrl,
     judge: judge,

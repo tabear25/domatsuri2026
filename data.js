@@ -6,6 +6,7 @@
  *  - teams        : 見たい2チームの名前と色
  *  - performances : そのチームの演舞（会場・開始・終了）
  *  - venues       : 会場マスタ（公式サイトの住所とGoogleマップ座標から作成済み）
+ *  - stationRides : 会場の最寄り駅どうしの電車所要時間
  *
  * 時刻は "HH:MM" の24時間表記。終了時刻がわからない演舞は end: null にすると、
  * defaultDurationMin 分の演舞として計算し、画面に「推定」と表示する。
@@ -28,11 +29,27 @@ window.DOMATSURI_DATA = {
   // ---- 計算のチューニング -------------------------------------------------
   // 終了時刻が不明なときに使う演舞時間（分）。
   // 今回のスケジュールは終了時刻がどこにも出ていないため、全演舞がこの値で補われる。
-  // 判定が変わるのは同じ会場で続けて演舞があるときだけ（移動が必要なペアは影響を受けない）。
   defaultDurationMin: 5,
+
   walkSpeedMPerMin: 80,     // 徒歩の分速（m/分）
   detourFactor: 1.3,        // 迂回係数。直線距離に掛けて実際の歩行距離に近づける
   transitHintMeters: 1200,  // 直線距離がこれを超えたら「電車ルート」リンクも出す
+
+  // 駅に着いてから電車に乗るまでの平均待ち（改札・ホーム移動＋待ち時間）。
+  // 名古屋市営地下鉄の休日日中はおよそ5分間隔なので、その半分＋移動で4分とした。
+  // 本数の少ない駅は stations で個別に上書きする。
+  boardingWaitMin: 4,
+
+  // 電車が徒歩よりこの分数以上速いときだけ電車を採用する。
+  // 2〜3分縮めるために1駅だけ地下に潜ることは実際にはやらないので、
+  // 差が小さいときは徒歩のままにしておく。
+  transitAdvantageMin: 5,
+
+  // stationRides に区間が無いときの保険。直線距離から乗車時間を概算する。
+  // 定数は下の実測区間のうち4つ（矢場町→平針 29分/9.9km、道徳→栄 22分/7.5km、
+  // 名古屋城→道徳 29分/9.2km、名古屋→矢場町 11分/2.4km）に合わせた。
+  // 短距離では多めに出るが、短距離では徒歩が採用されるので実害はない。
+  transitFallback: { baseMin: 6, minPerKm: 2.4 },
 
   // ---- 見たいチーム -------------------------------------------------------
   teams: [
@@ -41,110 +58,185 @@ window.DOMATSURI_DATA = {
   ],
 
   // ---- 演舞スケジュール ---------------------------------------------------
-  // 公式・各種まとめサイトの掲載時刻。すべて「◯◯頃」表記なので開始時刻自体が目安。
-  // 終了時刻はどこにも出ていないため end は null（defaultDurationMin で補う）。
+  // 出典: 公式チームページの演舞スケジュール
+  //   八雲一座  https://www.domatsuri.com/team/detail/91
+  //   夜さり華  https://domatsuri.com/team/detail/76
+  // 掲載時刻はすべて「◯◯頃」表記の目安。終了時刻はどこにも出ていないため
+  // end は null にしてある（defaultDurationMin で補う）。
   // date は必須。上のタブで選ばれている日と一致するものだけが画面に出る。
   performances: [
     // --- 八雲一座 ---
-    { date: "2026-08-29", teamId: "yakumo", venueId: "hisaya_main",  start: "18:55", end: null },
-    { date: "2026-08-29", teamId: "yakumo", venueId: "tv_tower",     start: "19:54", end: null },
-    { date: "2026-08-30", teamId: "yakumo", venueId: "tv_tower",     start: "10:12", end: null },
-    { date: "2026-08-30", teamId: "yakumo", venueId: "hisaya_main",  start: "12:15", end: null },
-    { date: "2026-08-30", teamId: "yakumo", venueId: "gurume",       start: "14:18", end: null },
-    { date: "2026-08-30", teamId: "yakumo", venueId: "aeon_atsuta",  start: "16:18", end: null },
-    { date: "2026-08-30", teamId: "yakumo", venueId: "hisaya_main",  start: "19:50", end: null },
+    { date: "2026-08-28", teamId: "yakumo", venueId: "hisaya_main",   start: "18:55", end: null },
+    { date: "2026-08-28", teamId: "yakumo", venueId: "tv_tower",      start: "19:54", end: null },
+    { date: "2026-08-29", teamId: "yakumo", venueId: "tv_tower",      start: "10:12", end: null },
+    { date: "2026-08-29", teamId: "yakumo", venueId: "hisaya_main",   start: "12:15", end: null },
+    { date: "2026-08-29", teamId: "yakumo", venueId: "gurume",        start: "14:18", end: null },
+    { date: "2026-08-29", teamId: "yakumo", venueId: "aeon_atsuta",   start: "16:18", end: null },
+    { date: "2026-08-29", teamId: "yakumo", venueId: "hisaya_main",   start: "19:50", end: null },
+    { date: "2026-08-30", teamId: "yakumo", venueId: "nagoya_castle", start: "10:06", end: null },
+    { date: "2026-08-30", teamId: "yakumo", venueId: "dotoku",        start: "12:06", end: null },
+    { date: "2026-08-30", teamId: "yakumo", venueId: "tv_tower",      start: "14:12", end: null },
+    { date: "2026-08-30", teamId: "yakumo", venueId: "nadya",         start: "16:06", end: null },
 
     // --- 夜さり華-yosaribana- ---
-    // 元データは「8/30(土)」表記だったが、8/29 が土曜・8/30 が日曜。
-    // 日付 8/30 が正しく曜日表記のほうが誤りであることを本人に確認済み。
-    { date: "2026-08-30", teamId: "yosaribana", venueId: "tv_tower",    start: "10:30", end: null },
-    { date: "2026-08-30", teamId: "yosaribana", venueId: "hisaya_main", start: "12:30", end: null },
-    { date: "2026-08-30", teamId: "yosaribana", venueId: "hirabari",    start: "14:42", end: null },
-    { date: "2026-08-30", teamId: "yosaribana", venueId: "gurume",      start: "16:42", end: null },
-    { date: "2026-08-30", teamId: "yosaribana", venueId: "oasis21",     start: "18:18", end: null },
+    // 8/28（前夜祭）の出演は公式チームページに掲載がない。
+    { date: "2026-08-29", teamId: "yosaribana", venueId: "tv_tower",    start: "10:30", end: null },
+    // 会場別のタイムテーブルではこの枠が 13:30頃（Cブロック）になっている。
+    // ここではチームページ側の 12:30 を採っている。どちらも「頃」表記の目安。
+    { date: "2026-08-29", teamId: "yosaribana", venueId: "hisaya_main", start: "12:30", end: null },
+    { date: "2026-08-29", teamId: "yosaribana", venueId: "hirabari",    start: "14:42", end: null,
+      note: "平針パレード会場は 8/29 12:30〜17:00 が交通規制。地下鉄で向かうこと。" },
+    { date: "2026-08-29", teamId: "yosaribana", venueId: "gurume",      start: "16:42", end: null },
+    { date: "2026-08-29", teamId: "yosaribana", venueId: "oasis21",     start: "18:18", end: null },
+    { date: "2026-08-30", teamId: "yosaribana", venueId: "jr_towers",   start: "10:00", end: null },
+    { date: "2026-08-30", teamId: "yosaribana", venueId: "dotoku",      start: "12:00", end: null },
+    { date: "2026-08-30", teamId: "yosaribana", venueId: "oasis21",     start: "14:00", end: null },
+    { date: "2026-08-30", teamId: "yosaribana", venueId: "agf_sakae",   start: "16:06", end: null },
   ],
+
+  // ---- 駅ごとの上書き -----------------------------------------------------
+  // boardingWaitMin では足りない、本数の少ない駅だけ書く。
+  stations: {
+    "道徳": {
+      waitMin: 8,
+      note: "名鉄常滑線の普通しか停まらない。日中は1時間に4本程度。",
+    },
+  },
+
+  // ---- 駅から駅への電車所要時間（分） -------------------------------------
+  // min は「乗る駅のホームから降りる駅まで」。乗り換えの待ち時間は含み、
+  // 最初の1本を待つ時間は含まない（それは boardingWaitMin で足す）。
+  // キーは "駅A|駅B"。向きは問わない（app.js が両方向を探す）。
+  //
+  // checked: true  … Yahoo!路線情報で 2026-08-25 に所要時間を確認した区間
+  // checked: false … 上の実測値と駅数から割り出した推定
+  // 今回のスケジュールで判定に効く区間は、すべて checked: true 側に入っている。
+  stationRides: {
+    // -- 実測 --
+    "矢場町|久屋大通":   { min: 4,  via: "名城線 栄経由 2駅", checked: true },
+    "矢場町|平針":       { min: 29, via: "名城線 矢場町→上前津 ／ 鶴舞線 上前津→平針", checked: true },
+    // 鶴舞でJR中央本線に乗り換えると約26分だが、地下鉄だけで完結する経路を採っている
+    "平針|金山":         { min: 30, via: "鶴舞線 平針→上前津 ／ 名城線 上前津→金山", checked: true },
+    "金山|矢場町":       { min: 6,  via: "名城線 東別院・上前津経由 3駅", checked: true },
+    "名古屋|名古屋城":   { min: 12, via: "桜通線 名古屋→久屋大通 ／ 名城線 久屋大通→名古屋城", checked: true },
+    "名古屋城|道徳":     { min: 29, via: "名城線 名古屋城→金山 ／ 名鉄名古屋本線 金山→道徳", checked: true },
+    "道徳|栄":           { min: 22, via: "名鉄常滑線 道徳→金山 ／ 名城線 金山→栄", checked: true },
+    "栄|平針":           { min: 31, via: "名城線 栄→上前津 ／ 鶴舞線 上前津→平針", checked: true },
+    "名古屋|矢場町":     { min: 11, via: "東山線 名古屋→栄 ／ 名城線 栄→矢場町", checked: true },
+    "名古屋|道徳":       { min: 18, via: "名鉄名古屋本線 直通 5駅", checked: true },
+    "栄|金山":           { min: 7,  via: "名城線 4駅", checked: true },
+
+    // -- 駅数からの推定（いずれも徒歩が速いか、今回の判定に効かない区間） --
+    "栄|久屋大通":       { min: 2,  via: "名城線 1駅", checked: false },
+    "矢場町|栄":         { min: 2,  via: "名城線 1駅", checked: false },
+    "名古屋|栄":         { min: 5,  via: "東山線 伏見経由 2駅", checked: false },
+    "名古屋|久屋大通":   { min: 4,  via: "桜通線 3駅", checked: false },
+    "名古屋|金山":       { min: 5,  via: "JR東海道線または名鉄名古屋本線 1駅", checked: false },
+    "久屋大通|名古屋城": { min: 2,  via: "名城線 1駅", checked: false },
+    "栄|名古屋城":       { min: 4,  via: "名城線 2駅", checked: false },
+    "矢場町|名古屋城":   { min: 6,  via: "名城線 3駅", checked: false },
+    "久屋大通|金山":     { min: 9,  via: "名城線 5駅", checked: false },
+    "名古屋城|金山":     { min: 11, via: "名城線 栄・上前津経由 6駅", checked: false },
+    "金山|道徳":         { min: 8,  via: "名鉄常滑線 3駅", checked: false },
+    "矢場町|大須観音":   { min: 8,  via: "名城線 矢場町→上前津 ／ 鶴舞線 上前津→大須観音", checked: false },
+    "久屋大通|平針":     { min: 31, via: "名城線 久屋大通→上前津 ／ 鶴舞線 上前津→平針", checked: false },
+  },
 
   // ---- 会場マスタ ---------------------------------------------------------
   // 住所・アクセスは domatsuri.com/access/place01〜16.html より。
   // 緯度経度は各ページのGoogleマップリンクを展開して取得した地点座標。
+  // station / stationWalkMin は access に書かれている最寄り駅と徒歩分をそのまま使う。
   venues: {
     hisaya_main: {
       name: "久屋大通公園会場メインステージ", short: "久屋大通 メインST",
       lat: 35.1650643, lng: 136.9090294,
       address: "名古屋市中区栄3丁目 久屋大通公園内「エディオン久屋広場」",
       access: "地下鉄名城線「矢場町」駅 2･5･6出口から徒歩1分／東山線・名城線「栄」駅15番出口から徒歩3分",
+      station: "矢場町", stationWalkMin: 1,
     },
     water_fes: {
       name: "どまつり総踊りウォーターフェス会場", short: "ウォーターフェス",
       lat: 35.1636571, lng: 136.9091116,
       address: "名古屋市中区栄3丁目 久屋大通公園内「光の広場」",
       access: "地下鉄名城線「矢場町」駅 5･6出口から徒歩1分",
+      station: "矢場町", stationWalkMin: 1,
     },
     gurume: {
       name: "ぐるめぱーく会場", short: "ぐるめぱーく",
       lat: 35.1664674, lng: 136.9089044,
       address: "名古屋市中区栄3丁目 久屋大通公園内「エンゼル広場」",
       access: "地下鉄名城線「矢場町」駅 2･5･6出口から徒歩1分／東山線・名城線「栄」駅15番出口から徒歩3分",
+      station: "矢場町", stationWalkMin: 1,
     },
     tv_tower: {
       name: "テレビ塔パレード会場", short: "テレビ塔パレード",
       lat: 35.1710126, lng: 136.9083813,
       address: "名古屋市中区錦3丁目5-15（ヒサヤオオドオリパークZONE4「ミズベヒロバ」）",
       access: "地下鉄名城線・桜通線「久屋大通」駅 セントラルパーク7A・7B・10A・10B出口 徒歩1分",
+      station: "久屋大通", stationWalkMin: 1,
     },
     agf_sakae: {
       name: "AGFサカエヒロバス会場", short: "サカエヒロバス",
       lat: 35.1684213, lng: 136.9087327,
       address: "名古屋市中区栄3丁目5-10 先",
       access: "地下鉄東山線・名城線「栄」駅 13・15・16番出口すぐ",
+      station: "栄", stationWalkMin: 1,
     },
     oasis21: {
       name: "オアシス21会場", short: "オアシス21",
       lat: 35.1709032, lng: 136.9096419,
       address: "名古屋市東区東桜一丁目11番1号 オアシス21",
       access: "地下鉄東山線・名城線「栄」駅 東改札出てすぐ",
+      station: "栄", stationWalkMin: 1,
     },
     nadya: {
       name: "ナディアパーク矢場公園会場", short: "ナディアパーク",
       lat: 35.1647687, lng: 136.9054363,
       address: "名古屋市中区栄3丁目26（矢場公園）",
       access: "地下鉄名城線「矢場町」駅 5番出口 徒歩3分",
+      station: "矢場町", stationWalkMin: 3,
     },
     jr_towers: {
       name: "名古屋駅前JRタワーズガーデン会場", short: "名駅JRタワーズ",
       lat: 35.1702549, lng: 136.8838908,
       address: "名古屋市中村区名駅1丁目1-4 JRセントラルタワーズ",
       access: "JR・地下鉄・名鉄・近鉄「名古屋」駅 徒歩2分",
+      station: "名古屋", stationWalkMin: 2,
     },
     nagoya_castle: {
       name: "名古屋城会場", short: "名古屋城",
       lat: 35.184537, lng: 136.901384,
       address: "名古屋市中区二の丸1（名古屋城内 二の丸広場）",
       access: "地下鉄名城線「名古屋城」駅 7番出口 徒歩10分",
+      station: "名古屋城", stationWalkMin: 10,
     },
     osu_kannon: {
       name: "大須観音会場", short: "大須観音",
       lat: 35.1596892, lng: 136.8994186,
       address: "名古屋市中区大須2-21-47 大須観音境内",
       access: "地下鉄鶴舞線「大須観音」駅 2番出口 徒歩3分／名城線「上前津」駅 9番出口 徒歩10分",
+      station: "大須観音", stationWalkMin: 3,
     },
     dotoku: {
       name: "どえりゃ～どうとくパレード会場", short: "どうとくパレード",
       lat: 35.1014296, lng: 136.9073854,
       address: "名古屋市南区道徳通1丁目～3丁目（道徳通）",
       access: "名鉄常滑線「道徳」駅（普通のみ停車）徒歩5分",
+      station: "道徳", stationWalkMin: 5,
     },
     hirabari: {
       name: "バリ・バリ平針パレード会場", short: "平針パレード",
       lat: 35.1245593, lng: 137.005415,
       address: "名古屋市天白区平針二丁目 平針駅前商店街区域内",
       access: "地下鉄鶴舞線「平針」駅 1番出口から西へ徒歩3分",
+      station: "平針", stationWalkMin: 3,
     },
     aeon_atsuta: {
       name: "イオンモール熱田会場", short: "イオン熱田",
       lat: 35.1363408, lng: 136.9095078,
       address: "名古屋市熱田区六野一丁目2番11号",
       access: "金山総合駅から南東に徒歩15分",
+      station: "金山", stationWalkMin: 15,
     },
     // 公式サイトに「都合により中止」と記載のある会場。
     // 誤ってスケジュールから参照したときに画面で警告を出すために残してある。
@@ -153,6 +245,7 @@ window.DOMATSURI_DATA = {
       lat: 35.1363408, lng: 136.9095078,
       address: "名古屋市熱田区六野一丁目2番11号",
       access: "この会場は中止になりました",
+      station: "金山", stationWalkMin: 15,
       cancelled: true,
     },
     ekinishi_ginza: {
@@ -160,12 +253,14 @@ window.DOMATSURI_DATA = {
       lat: 35.170106, lng: 136.875063,
       address: "名古屋市中村区 名古屋駅西銀座通商店街全域",
       access: "地下鉄桜通線「太閤通」駅 2番出口 北へ徒歩4分",
+      station: "太閤通", stationWalkMin: 4,
     },
     linear_town: {
       name: "リニアタウン名駅西会場", short: "リニアタウン名駅西",
       lat: 35.169893, lng: 136.878597,
       address: "名古屋市中村区椿町",
       access: "JR「名古屋」駅 太閤通口 エスカ4番出入口 徒歩4分",
+      station: "名古屋", stationWalkMin: 4,
     },
   },
 };
