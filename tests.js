@@ -369,9 +369,9 @@
     L.resolveSelectedDate({ day: "2026-08-28" }, "2026-08-30"), "2026-08-28");
 
   check("8/28 の演舞件数", L.countPerformances("2026-08-28"), 2);
-  check("8/29 の演舞件数", L.countPerformances("2026-08-29"), 10);
+  check("8/29 の演舞件数", L.countPerformances("2026-08-29"), 8);
   check("8/30 の演舞件数", L.countPerformances("2026-08-30"), 8);
-  check("3日の合計は20演舞", D.performances.length, 20);
+  check("3日の合計は18演舞", D.performances.length, 18);
 
   L.resetProblems();
   check("8/28 は八雲一座だけ",
@@ -415,33 +415,49 @@
   check("電車を採用した区間はすべて区間表にある（概算に落ちていない）",
     estimatedLegs.join(", ") || "なし", "なし");
 
-  var gurumeToHirabari = pairBetween(saturday, "gurume", "hirabari");
-  check("8/29 ぐるめぱーく→平針は電車で判定する", gurumeToHirabari.travel.mode, "transit");
-  check("8/29 ぐるめぱーく→平針はむずかしい", gurumeToHirabari.level.key, "hard");
+  var osuRepeat = pairBetween(saturday, "osu_kannon", "osu_kannon");
+  check("8/29 大須観音の連続は移動なし", osuRepeat.travel.mode, "same");
+  check("8/29 大須観音の連続はばっちり", osuRepeat.level.key, "best");
 
-  var hirabariToAeon = pairBetween(saturday, "hirabari", "aeon_atsuta");
-  check("8/29 平針→イオン熱田は電車で判定する", hirabariToAeon.travel.mode, "transit");
-  check("8/29 平針→イオン熱田はばっちり", hirabariToAeon.level.key, "best");
-  checkTrue("8/29 平針→イオン熱田は徒歩換算だと間に合わない区間",
-    hirabariToAeon.travel.walkMin > 60, "徒歩" + hirabariToAeon.travel.walkMin + "分");
+  var osuToSakae = pairBetween(saturday, "osu_kannon", "agf_sakae");
+  check("8/29 大須観音→サカエヒロバスはばっちり", osuToSakae.level.key, "best");
+  check("8/29 大須観音→サカエヒロバスは徒歩のまま（電車の差が5分未満）",
+    osuToSakae.travel.mode, "walk");
 
-  var aeonToGurumePair = pairBetween(saturday, "aeon_atsuta", "gurume");
-  check("8/29 イオン熱田→ぐるめぱーくはむずかしい", aeonToGurumePair.level.key, "hard");
-  checkTrue("8/29 イオン熱田→ぐるめぱーくの不足は10分未満（電車なら惜しいところまで来る）",
-    aeonToGurumePair.slack < 0 && aeonToGurumePair.slack > -10,
-    aeonToGurumePair.slack + "分");
+  var oasisToMeieki = pairBetween(saturday, "oasis21", "jr_towers");
+  check("8/29 オアシス21→名駅JRタワーズは電車で判定する", oasisToMeieki.travel.mode, "transit");
+  check("8/29 オアシス21→名駅JRタワーズはばっちり", oasisToMeieki.level.key, "best");
 
-  var castleToDotoku = pairBetween(sunday, "nagoya_castle", "dotoku");
-  check("8/30 名古屋城→どうとくは電車で判定する", castleToDotoku.travel.mode, "transit");
-  check("8/30 名古屋城→どうとくはばっちり", castleToDotoku.level.key, "best");
+  var meiekiToGurume = pairBetween(saturday, "jr_towers", "gurume");
+  check("8/29 名駅JRタワーズ→ぐるめぱーくは電車で判定する", meiekiToGurume.travel.mode, "transit");
+  check("8/29 名駅JRタワーズ→ぐるめぱーくは行ける", meiekiToGurume.level.key, "good");
 
-  var dotokuToOasis = pairBetween(sunday, "dotoku", "oasis21");
-  check("8/30 どうとく→オアシス21はばっちり", dotokuToOasis.level.key, "best");
-  check("8/30 どうとく発は道徳駅の長い待ちを使う", dotokuToOasis.travel.transit.waitMin, 8);
+  var meiekiToTv = pairBetween(sunday, "jr_towers", "tv_tower");
+  check("8/30 名駅JRタワーズ→テレビ塔は電車で判定する", meiekiToTv.travel.mode, "transit");
+  check("8/30 名駅JRタワーズ→テレビ塔は行ける", meiekiToTv.level.key, "good");
 
-  var nadyaToSakae = pairBetween(sunday, "nadya", "agf_sakae");
-  check("8/30 16:06の2件は同時刻の印が付く", nadyaToSakae.isSimultaneous, true);
-  check("8/30 16:06の2件はむずかしい", nadyaToSakae.level.key, "hard");
+  var tvToCastle = pairBetween(sunday, "tv_tower", "nagoya_castle");
+  check("8/30 テレビ塔→名古屋城は電車で判定する", tvToCastle.travel.mode, "transit");
+  check("8/30 テレビ塔→名古屋城はばっちり", tvToCastle.level.key, "best");
+
+  var castleToEkinishi = pairBetween(sunday, "nagoya_castle", "ekinishi_ginza");
+  check("8/30 名古屋城→名駅西銀座通は電車で判定する", castleToEkinishi.travel.mode, "transit");
+  check("8/30 名古屋城→名駅西銀座通はギリギリ", castleToEkinishi.level.key, "tight");
+  checkTrue("8/30 名古屋城→名駅西銀座通の余裕は5分未満",
+    castleToEkinishi.slack >= 0 && castleToEkinishi.slack < 5, castleToEkinishi.slack + "分");
+
+  var ekinishiToOasis = pairBetween(sunday, "ekinishi_ginza", "oasis21");
+  check("8/30 名駅西銀座通→オアシス21は電車で判定する", ekinishiToOasis.travel.mode, "transit");
+  check("8/30 名駅西銀座通→オアシス21は行ける", ekinishiToOasis.level.key, "good");
+
+  var nadyaRepeat = pairBetween(sunday, "nadya", "nadya");
+  check("8/30 ナディアパークの連続は移動なし", nadyaRepeat.travel.mode, "same");
+  check("8/30 ナディアパークの連続はギリギリ（6分しか空いていない）",
+    nadyaRepeat.level.key, "tight");
+
+  var nadyaToHisaya = pairBetween(sunday, "nadya", "hisaya_main");
+  check("8/30 ナディアパーク→久屋大通MSは徒歩", nadyaToHisaya.travel.mode, "walk");
+  check("8/30 ナディアパーク→久屋大通MSはばっちり", nadyaToHisaya.level.key, "best");
 
   check("実データの判定でも問題は出ない", L.getProblems().length, 0);
 
