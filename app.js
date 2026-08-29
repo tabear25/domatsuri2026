@@ -338,12 +338,32 @@
     return '<nav class="day-tabs">' + tabs + "</nav>";
   }
 
+  /**
+   * 次の演舞のチーム名。同じ時刻に複数チームが重なる日もあるので、
+   * nextEntry と開始時刻が同じ演舞をすべて拾って並べる。
+   */
+  function nextTeamNames(state) {
+    if (!state.nextEntry) return [];
+    var names = [];
+    (state.entries || [state.nextEntry]).forEach(function (entry) {
+      if (entry.startMin !== state.nextEntry.startMin) return;
+      if (names.indexOf(entry.team.name) === -1) names.push(entry.team.name);
+    });
+    return names;
+  }
+
+  function renderNextTeams(state) {
+    var names = nextTeamNames(state);
+    if (names.length === 0) return "";
+    return '<span class="header-next-team">' + escapeHtml(names.join("・")) + "</span>";
+  }
+
   function renderHeader(state) {
     var status;
     if (state.isLiveDay && state.nextEntry) {
       var until = state.nextEntry.startMin - state.nowMinutes;
       status = '<div class="header-status live">ただいま ' + toHHMM(state.nowMinutes) +
-        " ／ 次の演舞まで <strong>" + until + "分</strong></div>";
+        " ／ 次の演舞" + renderNextTeams(state) + "まで <strong>" + until + "分</strong></div>";
     } else if (state.isLiveDay) {
       status = '<div class="header-status live">ただいま ' + toHHMM(state.nowMinutes) +
         " ／ この日の演舞は終了</div>";
@@ -544,6 +564,7 @@
       selectedDate: selectedDate,
       // 選んだ日が実際の今日のときだけ、現在時刻での強調を働かせる
       isLiveDay: todayDate === selectedDate,
+      entries: entries,
       nextEntry: null
     };
     if (state.isLiveDay) {
